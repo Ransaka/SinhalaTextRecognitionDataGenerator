@@ -55,90 +55,83 @@ def main(text,background_img_path,font_path,font_size,color,shape=(512,512),rota
     for image,mask in zip(text_images,masks):
         image.paste(mask, mask=mask)
 
-    add_background(images = text_images,background_image_path = background_img_path,shape = shape,rotate_angle = rotate, rotate=rotate)
+    add_background(images = text_images,background_image_path = background_img_path,shape = shape,rotate_angle = rotate,masks=masks, rotate=rotate)
 
-def add_background(images, background_image_path, shape, rotate_angle, rotate=True):
-    # if rotate == True and len(images) == sum(rotate_angles==0):
-    #     raise Exception("ROtate set to True but all images are not rotated")
-    # if rotate == False and len(images) != sum(rotate_angles==0):
-    #     raise Exception("ROtate set to False but all images are not rotated")
-    
-    x_offset = y_offset = 100
+def add_background(images, background_image_path, shape, rotate_angle,masks, rotate=True):
+    x_offset, y_offset = 10, 10
+    max_height_by_row = -1
 
     # Read background image
     background = cv2.imread(background_image_path)
-    background = cv2.cvtColor(background, cv2.COLOR_BGR2RGB)  # Fix color conversion
+    background = cv2.cvtColor(background, cv2.COLOR_BGR2RGBA)
 
     # Resize background image
-    background = cv2.resize(background, (shape[1], shape[0]))  # Swap shape dimensions
+    background = cv2.resize(background, (shape[1], shape[0]))
 
-    # Convert PIL images to RGB images
-    images = [np.array(i.convert("RGB")) for i in images]
+    # Convert PIL images to RGBA
+    images = [i.convert("RGBA") for i in images]
 
-    # Add images to background
-    next_image_x = x_offset
-    next_image_y = y_offset
-    print("*"*30,rotate_angle,"*"*30)
-    max_height_by_row = -1
+    # Convert background to PIL image
+    background = Image.fromarray(background)
+    # background_height, background_width = background.size[1], background.size[0]
+
+    #create a new background for mask
+    background_mask = Image.new("RGBA", (shape[1], shape[0]))
+    
+    next_image_x, next_image_y = x_offset, y_offset
+
     for i,image in tqdm(enumerate(images)):
-        # save image
-        # cv2.imwrite("out/{}.png".format(next_image_x), image)
-        image_height, image_width, _ = image.shape
-        # print(f"Current max height by row {max_height_by_row}")
+        image_height, image_width = image.size[1], image.size[0]
+
         if rotate:
+            # Calculate rotated image height
             A = image_height / np.tan(np.deg2rad(abs(rotate_angle)))
             image_height_for_measures = (A + image_width) * np.sin(np.deg2rad(abs(rotate_angle)))
-            # round to nearest integer
             image_height_for_measures = np.ceil(image_height_for_measures).astype(int)
         else:
             image_height_for_measures = image_height
+
+        random_y = np.random.randint(0, int(image_width / 5))
         
-        if image_height_for_measures > max_height_by_row:
-            max_height_by_row = image_height_for_measures
-
-        random_y = 5#np.random.randint(0, int(image_width / 5))
-
-        if image_height_for_measures + next_image_x >= shape[0]:  # Check height condition
+        print(next_image_x, next_image_y)
+        if next_image_x + image_height_for_measures >= shape[1]:  
             next_image_x = x_offset + random_y
             next_image_y = y_offset
 
-        if image_width + next_image_y >= shape[1]:  # Check width condition
+        if next_image_y + image_width >= shape[0]:
             next_image_x += max_height_by_row + random_y
             next_image_y = y_offset
             max_height_by_row = -1
 
         remaining_space_x = shape[0] - next_image_x
         remaining_space_y = shape[1] - next_image_y
+        # print(remaining_space_x, remaining_space_y)
 
         if next_image_x >= shape[0] or next_image_y >= shape[1] or remaining_space_x < image_height_for_measures or remaining_space_y < image_width:
             print("No space left")
             break
+        
+        mask = image.convert("L")
+        background.paste(image, (next_image_y, next_image_x), mask)
 
-        background[next_image_x:next_image_x + image_height,
-                   next_image_y:next_image_y + image_width] = image
+        mask_mask = masks[i].convert("L")
+        
+        # if mask_mask is transparent then convert to white
+        # if np.array(mask_mask).sum() == 0:
+        #     mask_mask = Image.new("L", mask_mask.size, color=255)
+
+
+        background_mask.paste(mask_mask, (next_image_y, next_image_x),mask_mask)
 
         next_image_y += image_width + random_y
-        print(max_height_by_row)
+        # next_image_x += image_height_for_measures
 
-        # print("Remaining space x", )
-        # print("Remaining space y", shape[1] - next_image_y)
-        # print()
+        if image_height_for_measures > max_height_by_row:
+            max_height_by_row = image_height_for_measures
 
-    # Return as PIL image
-    background = Image.fromarray(background)
-
-    # Save image
     background.save("out/sin01.png")
+    background_mask.save("out/sin01_mask.png")
 
-text = """කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ.
-කොළඹ - නුවර කාර්යාල සේවකයින් රැගත් බස් රථයක් ලංගම බස්රථයක මුහුණට මුහුණ ගැටී අනතුරක් සිදුව තිබේ."""
+text = """කොළඹ - නුවර කාර්යාල සේවකයින් MAMA M"""
 
-main(text.strip(),"background/mink-mingle-96JD67agngE-unsplash.jpg","fonts/sin/AbhayaLibre-Medium.ttf",70,(255, 255, 255))
+main(text.strip(),"background/mink-mingle-96JD67agngE-unsplash.jpg","fonts/sin/AbhayaLibre-Medium.ttf",20,(255, 255, 255))
