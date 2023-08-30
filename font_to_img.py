@@ -1,16 +1,33 @@
+from typing import Union
 from PIL import Image, ImageFont, ImageDraw, ImageColor
 import cv2
 import numpy as np
 from tqdm import tqdm
 import warnings
+import random
 
 warnings.filterwarnings("ignore")
+
+def generate_random_color_dark():
+    # Generate random values for the red, green, and blue channels
+    red = random.randint(0, 19)    # Keep these values in a range that produces dark colors
+    green = random.randint(0, 19)  # Keep these values in a range that produces dark colors
+    blue = random.randint(0, 19)   # Keep these values in a range that produces dark colors
+    
+    # Convert the RGB values to a hex color code
+    hex_color = "#{:02X}{:02X}{:02X}".format(red, green, blue)
+    
+    return hex_color
+
+def generate_random_color()->str:
+    return "#"+''.join([random.choice("0123456789ABCDEF") for j in range(6)])
 
 def text_to_image(
 text: str,
 font_filepath: str,
 font_size: int,
-color: (int, int, int), #color is in RGB
+mask_background_color: Union[str, tuple] = "#000000",
+color: Union[str, tuple] = "#FFFFFF",
 font_align="center",
 rotate=False):
 
@@ -20,9 +37,8 @@ rotate=False):
 
     #add padding
     img = Image.new("RGBA", (box[0]+int(font_size/4), box[1]+int(font_size/4)))
-
     # create image mask
-    img_mask = Image.new("L", img.size, color='white')
+    img_mask = Image.new("L", img.size, color=mask_background_color)
 
     draw = ImageDraw.Draw(img)
     draw_point = (0, 0)
@@ -36,20 +52,23 @@ rotate=False):
     return img, img_mask,rotate_angle
 
 def main(text,background_img_path,font_path,font_size,color,shape=(512,512),rotate_flag=True):
+    color = generate_random_color_dark()
+    mask_background_color = generate_random_color() if random.choice([True,False]) else "#000000"
     if rotate_flag:
         rotate = np.random.randint(-15,15)
     else:
         rotate = rotate_flag
-    images = [text_to_image(
+    results = [text_to_image(
         text=i.replace(" ",""),
         font_filepath=font_path,
         font_size=font_size,
+        mask_background_color=mask_background_color,
         color=color,
         rotate=rotate
         ) for i in text.split()
         ]
-    text_images = [i[0] for i in images]
-    masks = [i[1] for i in images]
+    text_images = [i[0] for i in results]
+    masks = [i[1] for i in results]
     
     # combine images
     for image,mask in zip(text_images,masks):
@@ -91,7 +110,7 @@ def add_background(images, background_image_path, shape, rotate_angle,masks, rot
         else:
             image_height_for_measures = image_height
 
-        random_y = np.random.randint(0, int(image_width / 5))
+        random_y = 2#np.random.randint(0, int(image_width / 5))
         
         print(next_image_x, next_image_y)
         if next_image_x + image_height_for_measures >= shape[1]:  
@@ -111,17 +130,18 @@ def add_background(images, background_image_path, shape, rotate_angle,masks, rot
             print("No space left")
             break
         
+        # increase contrast of image
+        image = Image.eval(image, lambda px: px * 3)
+
         mask = image.convert("L")
         background.paste(image, (next_image_y, next_image_x), mask)
 
         mask_mask = masks[i].convert("L")
-        
-        # if mask_mask is transparent then convert to white
-        # if np.array(mask_mask).sum() == 0:
-        #     mask_mask = Image.new("L", mask_mask.size, color=255)
-
 
         background_mask.paste(mask_mask, (next_image_y, next_image_x),mask_mask)
+
+        # convert all non zero pixels to 255
+        background_mask = Image.eval(background_mask, lambda px: 255 if px != 0 else 0)
 
         next_image_y += image_width + random_y
         # next_image_x += image_height_for_measures
@@ -132,6 +152,6 @@ def add_background(images, background_image_path, shape, rotate_angle,masks, rot
     background.save("out/sin01.png")
     background_mask.save("out/sin01_mask.png")
 
-text = """කොළඹ - නුවර කාර්යාල සේවකයින් MAMA M"""
+text = """කොළඹ - නුවර කාර්යාල සේවකයින් සේවකයින් සේවකයින්"""
 
-main(text.strip(),"background/mink-mingle-96JD67agngE-unsplash.jpg","fonts/sin/AbhayaLibre-Medium.ttf",20,(255, 255, 255))
+main(text.strip(),"background/paper01.jpg","fonts/sin/AbhayaLibre-SemiBold.ttf",50,"#000000")
