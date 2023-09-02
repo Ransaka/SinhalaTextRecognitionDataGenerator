@@ -44,7 +44,7 @@ def generate_random_color()->str:
     return "#"+''.join([random.choice("0123456789ABCDEF") for j in range(6)])
 
 def randomize_parameters(N):
-    fonts = Path("fonts/sin").glob("*.ttf")
+    fonts = list(Path("fonts/sin").glob("*.ttf"))
     font_filepath_array = [np.random.choice(fonts) for i in range(N)]
     color_array = [generate_random_color() for i in range(N)]
     font_size_array = [np.random.randint(20,50) for i in range(N)]
@@ -68,7 +68,7 @@ def text_to_image(
     font_align="center",
     rotate=1):
 
-    font = ImageFont.truetype(font_filepath, size=font_size)
+    font = ImageFont.truetype(str(font_filepath), size=font_size)
     box = font.getsize_multiline(text)
     img = Image.new("RGBA", (box[0], box[1]))
 
@@ -91,7 +91,7 @@ def text_to_image(
     img = postprocess_image(img, blur_radius=0.5, color=color)
     return img, img_mask,rotate_angle
 
-def main(text,background_img_path,font_path,font_size,color,shape=(512,512),rotate_flag=False):
+def generator(text,background_image_path,font_filepath,font_size,color,perspective_transform,shape=(512,512),rotate_flag=False):
     color = generate_random_color_dark()
     mask_background_color =  "white"
     if rotate_flag:
@@ -101,7 +101,7 @@ def main(text,background_img_path,font_path,font_size,color,shape=(512,512),rota
         
     results = [text_to_image(
         text=i.replace(" ",""),
-        font_filepath=font_path,
+        font_filepath=font_filepath,
         font_size=font_size,
         mask_background_color=mask_background_color,
         color=color,
@@ -115,14 +115,14 @@ def main(text,background_img_path,font_path,font_size,color,shape=(512,512),rota
     # for image,mask in zip(text_images,masks):
     #     image.paste(mask, mask=mask)
 
-    add_background(images = text_images,background_image_path = background_img_path,shape = shape,rotate_angle = rotate,masks=masks, rotate=rotate)
+    add_background(images = text_images,background_image_path = background_image_path,shape = shape,rotate_angle = rotate,masks=masks, rotate=rotate)
 
-def add_background(images, background_image_path, shape, rotate_angle,masks, rotate=True):
+def add_background(images, background_image_path:Path, shape, rotate_angle,masks, rotate=True):
     x_offset, y_offset = 10, 10
     max_height_by_row = -1
 
     # Read background image
-    background = cv2.imread(background_image_path)
+    background = cv2.imread(str(background_image_path))
     background = cv2.cvtColor(background, cv2.COLOR_BGR2RGBA)
 
     # Resize background image
@@ -190,9 +190,10 @@ def add_background(images, background_image_path, shape, rotate_angle,masks, rot
         if image_height_for_measures > max_height_by_row:
             max_height_by_row = image_height_for_measures
 
-    background.save("out/sin01.png")
-    background_mask.save("out/sin01_mask.png")
+    save_id = np.random.randint(0,100000)
+    background.save(f"out/{save_id}.png")
+    background_mask.save(f"out/{save_id}_mask.png")
 
 text = """කොළඹ - නුවර කාර්යාල සේවකයින් සේවකයින් සේවකයින්"""
 
-main(text.strip(),"background/paper01.jpg","fonts/sin/AbhayaLibre-SemiBold.ttf",50,"#000000")
+# generator(text.strip(),"background/paper01.jpg","fonts/sin/AbhayaLibre-SemiBold.ttf",50,"#000000")
