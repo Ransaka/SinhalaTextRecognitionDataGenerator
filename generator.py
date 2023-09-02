@@ -6,10 +6,11 @@ import numpy as np
 from tqdm import tqdm
 import warnings
 import random
+from uuid import uuid4
 
 warnings.filterwarnings("ignore")
 
-def postprocess_image(img:Image,color:str,blur_radius=0.5):
+def postprocess_image(img:Image,color:str,perspective_transform:bool,blur_radius=0.5):
     # convert all non zero pixels to 255
     img = Image.eval(img, lambda px: 255 if px != 0 else 0)
     # blur the image
@@ -18,9 +19,12 @@ def postprocess_image(img:Image,color:str,blur_radius=0.5):
     img = img.convert("L")
     # convert to RGBA
     img = ImageOps.colorize(img,black="black", white=color)
-    return perspective_transform(img)
+    if perspective_transform:
+        img = perspective_transformation(img)
+    return img
+    # return perspective_transform(img)
 
-def perspective_transform(image:Image):
+def perspective_transformation(image:Image):
     # convert to numpy array
     image = np.array(image)
     original_points = np.float32([[0, 0], [image.shape[1], 0], [image.shape[1], image.shape[0]], [0, image.shape[0]]])
@@ -63,6 +67,7 @@ def text_to_image(
     text: str,
     font_filepath: str,
     font_size: int,
+    perspective_transform: bool,
     mask_background_color: Union[str, tuple] = "#FFFFFF",
     color: Union[str, tuple] = "#000000",
     font_align="center",
@@ -88,11 +93,11 @@ def text_to_image(
         rotate_angle = rotate
     else:
         rotate_angle = 0
-    img = postprocess_image(img, blur_radius=0.5, color=color)
+    img = postprocess_image(img, blur_radius=0.5, color=color,perspective_transform=perspective_transform)
     return img, img_mask,rotate_angle
 
 def generator(text,background_image_path,font_filepath,font_size,color,perspective_transform,shape=(512,512),rotate_flag=False):
-    color = generate_random_color_dark()
+    color = color
     mask_background_color =  "white"
     if rotate_flag:
         rotate = np.random.randint(-15,15)
@@ -105,16 +110,12 @@ def generator(text,background_image_path,font_filepath,font_size,color,perspecti
         font_size=font_size,
         mask_background_color=mask_background_color,
         color=color,
-        rotate=rotate
+        rotate=rotate,
+        perspective_transform=perspective_transform
         ) for i in text.split()
         ]
     text_images = [i[0] for i in results]
     masks = [i[1] for i in results]
-    
-    # combine images
-    # for image,mask in zip(text_images,masks):
-    #     image.paste(mask, mask=mask)
-
     add_background(images = text_images,background_image_path = background_image_path,shape = shape,rotate_angle = rotate,masks=masks, rotate=rotate)
 
 def add_background(images, background_image_path:Path, shape, rotate_angle,masks, rotate=True):
@@ -190,10 +191,6 @@ def add_background(images, background_image_path:Path, shape, rotate_angle,masks
         if image_height_for_measures > max_height_by_row:
             max_height_by_row = image_height_for_measures
 
-    save_id = np.random.randint(0,100000)
+    save_id = uuid4()
     background.save(f"out/{save_id}.png")
     background_mask.save(f"out/{save_id}_mask.png")
-
-text = """කොළඹ - නුවර කාර්යාල සේවකයින් සේවකයින් සේවකයින්"""
-
-# generator(text.strip(),"background/paper01.jpg","fonts/sin/AbhayaLibre-SemiBold.ttf",50,"#000000")
