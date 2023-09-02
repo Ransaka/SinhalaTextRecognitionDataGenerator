@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Union
+from typing import List, Tuple, Union
 from PIL import Image, ImageFont, ImageDraw, ImageColor, ImageOps, ImageFilter
 import cv2
 import numpy as np
@@ -90,11 +90,29 @@ def text_to_image(
         # img.save(f"out/without_smoothing_{id}.png")
         # img = postprocess_image(img, blur_radius=0.5, color=color)
         img_mask = img_mask.rotate(rotate, expand=True,resample=Image.BICUBIC)
-        rotate_angle = rotate
-    else:
-        rotate_angle = 0
+    #     rotate_angle = rotate
+    # else:
+    #     rotate_angle = 0
     img = postprocess_image(img, blur_radius=0.5, color=color,perspective_transform=perspective_transform)
-    return img, img_mask,rotate_angle
+    return img, img_mask,text
+
+def get_lables_json(text:str,height:int,width:int,x_corrdinate:int,y_corrdinate:int,font_size:int):
+    """Write the labels to a json file
+    Args:
+        text (str): text to be written
+        image (Image): image
+        x_corrdinate (int): upper left x coordinate
+        y_corrdinate (int): upper left y coordinate
+        font_size (int): font size
+        """
+    return {
+        "text":text,
+        "x":x_corrdinate,
+        "y":y_corrdinate,
+        "width":width,
+        "height":height,
+        "font_size":font_size
+    }
 
 def generator(text,background_image_path,font_filepath,font_size,color,perspective_transform,shape=(512,512),rotate_flag=False):
     color = color
@@ -116,9 +134,28 @@ def generator(text,background_image_path,font_filepath,font_size,color,perspecti
         ]
     text_images = [i[0] for i in results]
     masks = [i[1] for i in results]
-    add_background(images = text_images,background_image_path = background_image_path,shape = shape,rotate_angle = rotate,masks=masks, rotate=rotate)
+    text = [i[2] for i in results]
+    
+    return add_background(
+        images = text_images, 
+        text=text, 
+        background_image_path = background_image_path, 
+        shape = shape, 
+        rotate_angle = rotate, 
+        masks=masks, 
+        rotate=rotate,
+        font_size=font_size
+        )
 
-def add_background(images, background_image_path:Path, shape, rotate_angle,masks, rotate=True):
+def add_background(
+        images:Image, 
+        background_image_path:Path, 
+        shape:Tuple, 
+        rotate_angle:int,
+        masks:List, 
+        text:List, 
+        font_size:int,
+        rotate=True):
     x_offset, y_offset = 10, 10
     max_height_by_row = -1
 
@@ -141,8 +178,9 @@ def add_background(images, background_image_path:Path, shape, rotate_angle,masks
     # convert to all black
     background_mask  = Image.eval(background_mask, lambda px: 1 if px != 0 else 1)
     next_image_x, next_image_y = x_offset, y_offset
-
-    for i,image in tqdm(enumerate(images)):
+    image_id = str(uuid4())
+    labels = {image_id:[]}
+    for i,image in enumerate(images):
         image_height, image_width = image.size[1], image.size[0]
 
         if rotate:
@@ -155,7 +193,7 @@ def add_background(images, background_image_path:Path, shape, rotate_angle,masks
 
         random_y = np.random.randint(0, int(image_width / 5))
         
-        print(next_image_x, next_image_y)
+        # print(next_image_x, next_image_y)
         if next_image_x + image_height_for_measures >= shape[1]:  
             next_image_x = x_offset + random_y
             next_image_y = y_offset
@@ -170,7 +208,7 @@ def add_background(images, background_image_path:Path, shape, rotate_angle,masks
         # print(remaining_space_x, remaining_space_y)
 
         if next_image_x >= shape[0] or next_image_y >= shape[1] or remaining_space_x < image_height_for_measures or remaining_space_y < image_width:
-            print("No space left")
+            # print("No space left")
             break
         
         # increase contrast of image
@@ -182,6 +220,7 @@ def add_background(images, background_image_path:Path, shape, rotate_angle,masks
         mask_mask = masks[i].convert("L")
 
         background_mask.paste(mask_mask, (next_image_y, next_image_x),mask_mask)
+        labels[image_id].append(get_lables_json(text=text[i],height=image_height_for_measures,width=image_width,x_corrdinate=next_image_y,y_corrdinate=next_image_x,font_size=font_size))
         # convert all non zero pixels to 255
         # background_mask = Image.eval(background_mask, lambda px: 255 if px != 0 else 0)
 
@@ -191,6 +230,6 @@ def add_background(images, background_image_path:Path, shape, rotate_angle,masks
         if image_height_for_measures > max_height_by_row:
             max_height_by_row = image_height_for_measures
 
-    save_id = uuid4()
-    background.save(f"out/{save_id}.png")
-    background_mask.save(f"out/{save_id}_mask.png")
+    # background.save(f"out/{image_id}.png")
+    # background_mask.save(f"out/{image_id}_mask.png")
+    return background,background_mask,labels
