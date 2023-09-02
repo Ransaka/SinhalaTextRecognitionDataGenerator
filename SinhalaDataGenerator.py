@@ -1,51 +1,79 @@
 import json
 from pathlib import Path
+import numpy as np
+from tqdm import tqdm
 from generator import generator, randomize_parameters
-from multiprocessing import Pool
-
-TEXT = """
-ජාත්‍යන්තර පොලීසිය විසින් මේ වනවිට අපරාධකරුවන්ට රතු නිවේදන නිකුත් කිරීම ප්‍රතික්ෂේප කරන බව අපරාධ හා වැඩබලන නීති දිසාව භාර නියෝජ්‍ය පොලිස්පති අසංග කරවිට මහතා පවසයි.
-ඔහු පෙන්වා දෙන්නේ, මත්ද්‍රව්‍ය සම්බන්ධ වැරදි සහ ඝාතනවලට අදාළව මෙරටදී ලබාදෙන දඬුවම මරණීය දණ්ඩනය බවට සඳහන්වීම ඊට හේතුව බවය. 
-විවෘත සහ වගකිවයුතු රජයක් සඳහා ආංශික අධීක්ෂණ කාරක සභාව හමුවට මහජන ආරක්ෂණ අමාත්‍යංශය හා ශ්‍රී ලංකා පොලීසිය කැඳවු අවස්ථාවේදී මේ පිළිබඳ කරුණු අනාවරණ විය.
-"""
+from multiprocessing import Pool, cpu_count
 
 class SinhalaTextGenerator:
-    def __init__(self) -> None:
-        pass
-    def generate(self,N,num_procs):
+    def __init__(self,data_path,save_interval=100) -> None:
+        self.text = open(data_path,"r").read().split("\n")
+        self.text = [t for t in self.text if len(t) > 0]
+        self.save_interval = save_interval
+    def generate_with_progress(self,args):
+        return generator(*args)
+    def generate(self, N, num_procs):
         parameters = randomize_parameters(N)
-        parameters['text'] = [TEXT for i in range(N)]
+        parameters['text'] = np.random.choice(self.text, N, replace=True)
         kwargs = {
-            "text":parameters["text"],
-            "background_image_path":parameters["background_image_path"],
-            "font_filepath":parameters["font_filepath"],
-            "font_size":parameters["font_size"],
-            "color":parameters["color"],
-            "perspective_transform":parameters["perspective_transform"]
+            "text": parameters["text"],
+            "background_image_path": parameters["background_image_path"],
+            "font_filepath": parameters["font_filepath"],
+            "font_size": parameters["font_size"],
+            "color": parameters["color"],
+            "perspective_transform": parameters["perspective_transform"]
         }
-        print(kwargs)
-        with Pool(num_procs) as p:
-            results = p.starmap(generator, zip(*kwargs.values()))
         
-        labels = [res[2] for res in results]
-        images = [res[0] for res in results]
-        masks = [res[1] for res in results]
+        if num_procs == -1:
+            num_procs = cpu_count()
 
-        self.save_results(labels,images,masks)
+        with Pool(num_procs) as p:
+            results = []
+            labels_list = []
+            with tqdm(desc="Generating Images", total=N) as progress:
+                for i, result in enumerate(p.imap(self.generate_with_progress, zip(*kwargs.values()))):
+                    results.append(result)
+                    progress.update(1)
 
-    def save_results(self,labels,images,masks):
+                    if i % self.save_interval == 0:
+                        labels = [res[2] for res in results]
+                        images = [res[0] for res in results]
+                        masks = [res[1] for res in results]
+                        image_ids = [list(label.keys())[0] for label in labels]
+                        self.save_images( images, masks, image_ids)
+
+                        labels_list.extend(labels)
+                        results = []  # Clear the results list
+
+            # Save any remaining results
+            if results:
+                labels = [res[2] for res in results]
+                images = [res[0] for res in results]
+                masks = [res[1] for res in results]
+                image_ids = [list(label.keys())[0] for label in labels]
+
+                self.save_images(images, masks, image_ids)
+                labels_list.extend(labels)
+
+        self.save_labels(labels_list)
+
+    def save_labels(self,labels):
+        with open("out/labels.json", "w",encoding='utf-8') as f:
+            json.dump(labels, f, indent=4, ensure_ascii=False)
+
+    def save_images(self,images,masks,image_ids):
         Path("out").mkdir(exist_ok=True)
         Path("out/images").mkdir(exist_ok=True)
         Path("out/masks").mkdir(exist_ok=True)
-        # Save as json
-        with open("out/labels.json","wb") as f:
-            f.write(json.dumps(labels,indent=4,ensure_ascii=False).encode("utf-8"))
         # Save as images
         for i in range(len(images)):
-            image_id = list(labels[i].keys())[0]
+            image_id = image_ids[i]
             images[i].save(f"out/images/image_{image_id}.png")
             masks[i].save(f"out/masks/mask_{image_id}.png")
 
 if __name__ == "__main__":
-    sinhala_text_generator = SinhalaTextGenerator()
-    sinhala_text_generator.generate(N=100,num_procs=8)
+    data_path = "text/data.txt"
+    sinhala_text_generator = SinhalaTextGenerator(
+        data_path=data_path
+    )
+    sinhala_text_generator.generate(N=100,num_procs=-1)
