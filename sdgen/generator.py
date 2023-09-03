@@ -200,7 +200,7 @@ def add_background(
 
         if next_image_y + image_width >= shape[0]:
             next_image_x += max_height_by_row + random_y
-            next_image_y = y_offset
+            next_image_y = np.random.randint(0, int(shape[1] / 5))
             max_height_by_row = -1
             rows += 1
 
