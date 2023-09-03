@@ -31,7 +31,7 @@ class SinhalaTextGenerator:
             results = []
             labels_list = []
             with tqdm(desc="Generating Images", total=N) as progress:
-                for i, result in enumerate(p.imap(self.generate_with_progress, zip(*kwargs.values()))):
+                for i, result in enumerate(p.map(self.generate_with_progress, zip(*kwargs.values()))):
                     results.append(result)
                     progress.update(1)
 

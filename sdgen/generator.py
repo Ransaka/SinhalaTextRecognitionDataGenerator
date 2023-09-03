@@ -180,6 +180,7 @@ def add_background(
     next_image_x, next_image_y = x_offset, y_offset
     image_id = str(uuid4())
     labels = {image_id:[]}
+    rows = 0
     for i,image in enumerate(images):
         image_height, image_width = image.size[1], image.size[0]
 
@@ -194,22 +195,23 @@ def add_background(
         random_y = np.random.randint(0, int(image_width / 5))
         
         # print(next_image_x, next_image_y)
-        if next_image_x + image_height_for_measures >= shape[1]:  
-            next_image_x = x_offset + random_y
-            next_image_y = y_offset
+        if next_image_x + image_height_for_measures >= shape[1]:
+            break
 
         if next_image_y + image_width >= shape[0]:
             next_image_x += max_height_by_row + random_y
             next_image_y = y_offset
             max_height_by_row = -1
+            rows += 1
 
         remaining_space_x = shape[0] - next_image_x
         remaining_space_y = shape[1] - next_image_y
         # print(remaining_space_x, remaining_space_y)
 
         if next_image_x >= shape[0] or next_image_y >= shape[1] or remaining_space_x < image_height_for_measures or remaining_space_y < image_width:
-            # print("No space left")
             break
+        
+        # if remaining_space_x
         
         # increase contrast of image
         image = Image.eval(image, lambda px: px * 8)
