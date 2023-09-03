@@ -156,7 +156,7 @@ def add_background(
         text:List, 
         font_size:int,
         rotate=True):
-    x_offset, y_offset = 10, 10
+    x_offset, y_offset = np.random.randint(0, int(shape[0] / 5)), np.random.randint(0, int(shape[1] / 5))
     max_height_by_row = -1
 
     # Read background image
