@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 import numpy as np
 from tqdm import tqdm
-from generator import generator, randomize_parameters
+from .generator import generator, randomize_parameters
 from multiprocessing import Pool, cpu_count
 
 class SinhalaTextGenerator:
@@ -58,22 +58,15 @@ class SinhalaTextGenerator:
         self.save_labels(labels_list)
 
     def save_labels(self,labels):
-        with open("out/labels.json", "w",encoding='utf-8') as f:
+        with open("../out/labels.json", "w",encoding='utf-8') as f:
             json.dump(labels, f, indent=4, ensure_ascii=False)
 
     def save_images(self,images,masks,image_ids):
-        Path("out").mkdir(exist_ok=True)
-        Path("out/images").mkdir(exist_ok=True)
-        Path("out/masks").mkdir(exist_ok=True)
+        Path("../out").mkdir(exist_ok=True)
+        Path("../out/images").mkdir(exist_ok=True)
+        Path("../out/masks").mkdir(exist_ok=True)
         # Save as images
         for i in range(len(images)):
             image_id = image_ids[i]
-            images[i].save(f"out/images/image_{image_id}.png")
-            masks[i].save(f"out/masks/mask_{image_id}.png")
-
-if __name__ == "__main__":
-    data_path = "text/data.txt"
-    sinhala_text_generator = SinhalaTextGenerator(
-        data_path=data_path
-    )
-    sinhala_text_generator.generate(N=100,num_procs=-1)
+            images[i].save(f"../out/images/image_{image_id}.png")
+            masks[i].save(f"../out/masks/mask_{image_id}.png")

@@ -48,12 +48,12 @@ def generate_random_color()->str:
     return "#"+''.join([random.choice("0123456789ABCDEF") for j in range(6)])
 
 def randomize_parameters(N):
-    fonts = list(Path("fonts/sin").glob("*.ttf"))
+    fonts = list(Path("../fonts/sin").glob("*.ttf"))
     font_filepath_array = [np.random.choice(fonts) for i in range(N)]
     color_array = [generate_random_color() for i in range(N)]
     font_size_array = [np.random.randint(20,50) for i in range(N)]
     perspective_transform_array = [np.random.choice([True,False]) for i in range(N)]
-    background_image_path_array = [np.random.choice(list(Path("background").glob("*.jpg"))) for i in range(N)]
+    background_image_path_array = [np.random.choice(list(Path("../background").glob("*.jpg"))) for i in range(N)]
     parameters = {
         "font_filepath":font_filepath_array,
         "color":color_array,
