@@ -4,17 +4,64 @@ import numpy as np
 from tqdm import tqdm
 from .generator import generator, randomize_parameters
 from multiprocessing import Pool, cpu_count
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SinhalaTextGenerator:
-    def __init__(self,data_path,save_interval=100) -> None:
+    def __init__(
+            self,
+            data_path,
+            save_interval=100,
+            shape=(512, 512),
+            min_text_length=1,
+            font_dir=None, 
+            font_size=None, 
+            background_image_dir=None,
+            color=None, 
+            perspective_transform=None,
+            start_word_xy = None,
+            line_space = None,
+            word_space = None,
+            rotate_flag = False,
+            sample_with_replace =False
+            ) -> None:
         self.text = open(data_path,"r").read().split("\n")
-        self.text = [t for t in self.text if len(t) > 0]
+        self.text = [t for t in self.text if len(t) > min_text_length]
         self.save_interval = save_interval
+        self.font_dir = font_dir
+        self.font_size = font_size
+        self.background_image_dir = background_image_dir
+        self.color = color
+        self.shape = shape
+        self.perspective_transform = perspective_transform
+        self.start_word_xy = start_word_xy
+        self.line_space = line_space
+        self.word_space = word_space
+        self.rotate_flag = rotate_flag
+        self.sample_with_replace = sample_with_replace
+
     def generate_with_progress(self,args):
+        common_args = [self.shape, self.start_word_xy, self.line_space, self.word_space, self.rotate_flag]
+        args = list(args)
+        args.extend(common_args)
         return generator(*args)
+    
     def generate(self, N, num_procs):
-        parameters = randomize_parameters(N)
-        parameters['text'] = np.random.choice(self.text, N, replace=True)
+        # if requred sample size is greater than the number of text samples in the dataset throw an warning
+        if N > len(self.text):
+            logger.warning(
+                f"Requested sample size ({N}) is greater than the number of text samples ({len(self.text)}). This will result in duplicate samples."
+            )
+        parameters = randomize_parameters(
+            N,
+            font_dir=self.font_dir,
+            font_size=self.font_size,
+            background_image_dir=self.background_image_dir,
+            color=self.color,
+            perspective_transform=self.perspective_transform
+            )
+        parameters['text'] = np.random.choice(self.text, N, replace= self.sample_with_replace)
         kwargs = {
             "text": parameters["text"],
             "background_image_path": parameters["background_image_path"],
